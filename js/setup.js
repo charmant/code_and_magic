@@ -1,22 +1,18 @@
 'use strict';
 
 (function () {
-  var ESC_KEYCODE = 27;
-  var ENTER_KEYCODE = 13;
+  var NUM_OF_WIZARDS = 4;
   var userDialog = document.querySelector('.setup');
-  var setupOpen = document.querySelector('.setup-open');
   var setupSubmit = userDialog.querySelector('.setup-submit');
-  var setupClose = userDialog.querySelector('.setup-close');
-  var setupUserName = userDialog.querySelector('.setup-user-name');
   var wizardCoat = userDialog.querySelector('.wizard-coat');
   var wizardEyes = userDialog.querySelector('.wizard-eyes');
   var wizardFireball = userDialog.querySelector('.setup-fireball-wrap');
   var dataForm = userDialog.querySelector('.setup-wizard-form');
-
   var setupSimilar = document.querySelector('.setup-similar');
   var setupSimilarList = document.querySelector('.setup-similar-list');
   var setupSimilarItem = document.querySelector('#similar-wizard-template').content.querySelector('.setup-similar-item');
-  var numOfWizards = 4;
+  var wizardsData = [];
+
   var wizardName = [
     'Иван',
     'Хуан Себастьян',
@@ -59,91 +55,91 @@
     '#e848d5',
     '#e6e848'];
 
+  var coatColor = wizardCoatColor[0];
+  var eyesColor = wizardEyesColor[0];
+  var prevTimeout;
+
+  // return random number of array
   var rand = function (array) {
     return Math.floor(Math.random() * array.length);
   };
 
-  var renderWizard = function (wizardData) {
-    var wizardElement = setupSimilarItem.cloneNode(true);
-    var name = wizardElement.querySelector('.setup-similar-label');
-    var colorCoat = wizardElement.querySelector('.wizard-coat');
-    var colorEyes = wizardElement.querySelector('.wizard-eyes');
+  // render wizards and paste rendered wizards in document
+  var render = function (data) {
+    var items = document.createDocumentFragment();
+    for (var i = 0; i < NUM_OF_WIZARDS; i++) {
+      var wizardElement = setupSimilarItem.cloneNode(true);
+      var name = wizardElement.querySelector('.setup-similar-label');
+      var colorCoat = wizardElement.querySelector('.wizard-coat');
+      var colorEyes = wizardElement.querySelector('.wizard-eyes');
 
-    name.textContent = wizardData.name;
-    colorCoat.style.fill = wizardData.colorCoat;
-    colorEyes.style.fill = wizardData.colorEyes;
+      name.textContent = data[i].name;
+      colorCoat.style.fill = data[i].colorCoat;
+      colorEyes.style.fill = data[i].colorEyes;
 
-    return wizardElement;
+      items.appendChild(wizardElement);
+    };
+    setupSimilarList.textContent = '';
+    setupSimilarList.appendChild(items);
   };
 
-  // open and close popup window - wizardSetup
-  var onPopupEscPress = function (evt) {
-    if (evt.keyCode === ESC_KEYCODE && !(setupUserName === document.activeElement)) {
-      closePopup();
-    }
+  // takes data of wizards and
+  // sets rank of wizards based on coat, eyes of user wizard
+  var getRank = function (wizard) {
+    var rank = 0;
+    if (wizard.colorCoat === coatColor) {
+      rank += 2;
+    };
+    if (wizard.colorEyes === eyesColor) {
+      rank += 1;
+    };
+    return rank;
   };
 
-  var openPopup = function () {
-    userDialog.classList.remove('hidden');
-    document.addEventListener('keydown', onPopupEscPress);
+  // update similar wizards
+  var updateWizards = function () {
+    render(wizardsData.slice().sort(function (left, right) {
+      var rankDiff = getRank(right) - getRank(left);
+      if (rankDiff === 0) {
+        rankDiff = wizardsData.indexOf(left) - wizardsData.indexOf(right);
+      }
+      return rankDiff;
+    }));
   };
 
-  var closePopup = function () {
-    userDialog.classList.add('hidden');
-    document.removeEventListener('keydown', onPopupEscPress);
-    userDialog.removeAttribute('style');
-  };
-
-  setupOpen.addEventListener('click', function () {
-    openPopup();
-  });
-
-  setupOpen.addEventListener('keydown', function (evt) {
-    if (evt.keyCode === ENTER_KEYCODE) {
-      openPopup();
-    }
-  });
-
-  setupClose.addEventListener('click', function () {
-    closePopup();
-  });
-
-  setupClose.addEventListener('keydown', function (evt) {
-    if (evt.keyCode === ENTER_KEYCODE) {
-      closePopup();
-    }
-  });
-
-  // setup user wizard's coat, eyes, fireball
+  // setup user wizard's coat and eyes
   var fillElement = function (element, color) {
     element.style.fill = color;
+    if (element.classList.value === 'wizard-coat') {
+      coatColor = color;
+    } else if (element.classList.value === 'wizard-eyes') {
+      eyesColor = color;
+    };
+    if (prevTimeout) {
+      window.clearTimeout(prevTimeout);
+    }
+    prevTimeout = window.setTimeout(function () {
+      updateWizards();
+    }, 500);
   };
 
+  // setup user wizard's fireball
   var changeElementBackground = function (element, color) {
     element.style.backgroundColor = color;
   };
 
-  window.colorizeElement(wizardCoat, wizardCoatColor, fillElement);
-  window.colorizeElement(wizardEyes, wizardEyesColor, fillElement);
-  window.colorizeElement(wizardFireball, wizardFireballColor, changeElementBackground);
-
-  // get data and status from server
+  // gets data or status from server
   var onLoad = function (data) {
     if (data) {
-      console.log('Successfully got data');
-      var items = document.createDocumentFragment();
-      for (var i = 0; i < numOfWizards; i++) {
-        var wizard = data[rand(data)];
-        items.appendChild(renderWizard(wizard));
-      };
-      setupSimilarList.appendChild(items);
+      wizardsData = data;
+      updateWizards();
       setupSimilar.classList.remove('hidden');
     } else {
-      console.log('Successfully sent data');
       userDialog.classList.add('hidden');
     };
   };
 
+  // if the request returned an error ---> shows error message
   var onError = function (errorMessage) {
     console.error(errorMessage);
     var node = document.createElement('div');
@@ -157,10 +153,14 @@
     document.body.insertAdjacentElement('afterbegin', node);
   };
 
-  //load data from server
+  window.colorizeElement(wizardCoat, wizardCoatColor, fillElement);
+  window.colorizeElement(wizardEyes, wizardEyesColor, fillElement);
+  window.colorizeElement(wizardFireball, wizardFireballColor, changeElementBackground);
+
+  // loads data from server
   window.backend.load(onLoad, onError);
 
-  //submit data and send to server
+  // submits data and sends to server
   setupSubmit.addEventListener('click', function (evt) {
     window.backend.save(new FormData(dataForm), onLoad, onError);
     evt.preventDefault();
