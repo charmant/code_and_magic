@@ -13,7 +13,7 @@
       xhr.addEventListener('load', function () {
         switch (xhr.status) {
           case successStatus:
-            return onLoad(xhr.response);
+            onLoad(xhr.response);
             break;
           default:
             onError('Неизвестный статус: ' + xhr.status + ' ' + xhr.statusText);
